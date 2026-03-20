@@ -1,0 +1,27 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ trunk ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 138.197.114.127
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            export PATH="$HOME/.rbenv/bin:$PATH"
+            eval "$(rbenv init -)"
+            cd /var/www/home-videos/current
+            git pull origin trunk
+            bundle install --without development test
+            RAILS_ENV=production bundle exec rake db:migrate
+            RAILS_ENV=production bundle exec rake assets:precompile
+            sudo systemctl restart puma

@@ -1,8 +1,5 @@
-require "shellwords"
-
 class SyncVideosService
   VIDEO_EXTENSIONS = %w[.mp4 .mov .avi .m4v .mkv .webm].freeze
-  THUMBNAIL_PREFIX = "thumbnails/".freeze
 
   def self.call
     new.call
@@ -24,7 +21,7 @@ class SyncVideosService
         file_size:   object.size
       )
 
-      generate_thumbnail(video)
+      GenerateThumbnailJob.perform_later(video.id)
     end
 
     puts "Sync complete."
@@ -54,51 +51,5 @@ class SyncVideosService
     end
   rescue
     nil
-  end
-
-  def generate_thumbnail(video)
-    ext = File.extname(video.spaces_key)
-    basename = File.basename(video.spaces_key, ext)
-    thumbnail_key = "#{THUMBNAIL_PREFIX}#{basename}.jpg"
-
-    Dir.mktmpdir do |tmpdir|
-      video_path     = File.join(tmpdir, "video#{ext}")
-      thumbnail_path = File.join(tmpdir, "thumb.jpg")
-
-      # Download video from Spaces
-      SPACES_CLIENT.get_object(
-        bucket: bucket,
-        key:    video.spaces_key,
-        response_target: video_path
-      )
-
-      # Extract a frame at 2 seconds (or 0 if shorter)
-      system("ffmpeg -y -ss 2 -i #{video_path.shellescape} -vframes 1 -q:v 3 #{thumbnail_path.shellescape} 2>/dev/null")
-
-      unless File.exist?(thumbnail_path)
-        puts "  ffmpeg failed for #{video.spaces_key}, skipping thumbnail"
-        return
-      end
-
-      # Get duration from ffprobe
-      duration_output = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 #{video_path.shellescape} 2>/dev/null`
-      duration = duration_output.strip.to_f.to_i
-
-      # Upload thumbnail to Spaces
-      File.open(thumbnail_path, "rb") do |file|
-        SPACES_CLIENT.put_object(
-          bucket:       bucket,
-          key:          thumbnail_key,
-          body:         file,
-          content_type: "image/jpeg",
-          acl:          "public-read"
-        )
-      end
-
-      video.update!(thumbnail_key: thumbnail_key, duration: duration)
-      puts "  thumbnail generated: #{thumbnail_key}"
-    end
-  rescue => e
-    puts "  error generating thumbnail for #{video.spaces_key}: #{e.message}"
   end
 end

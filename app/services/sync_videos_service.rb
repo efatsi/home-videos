@@ -17,7 +17,7 @@ class SyncVideosService
       video = Video.create!(
         spaces_key:  object.key,
         title:       title_from_key(object.key),
-        recorded_at: recorded_at_from_key(object.key) || object.last_modified,
+        recorded_at: recorded_at_from_metadata(object.key) || recorded_at_from_key(object.key) || object.last_modified,
         file_size:   object.size
       )
 
@@ -42,6 +42,16 @@ class SyncVideosService
 
   def title_from_key(key)
     File.basename(key, ".*").gsub(/[-_]/, " ").split.map(&:capitalize).join(" ")
+  end
+
+  def recorded_at_from_metadata(key)
+    url = "#{ENV['SPACES_ENDPOINT']}/#{ENV['SPACES_BUCKET']}/#{key}"
+    output = `ffprobe -v quiet -print_format json -show_format "#{url}" 2>/dev/null`
+    tags = JSON.parse(output).dig("format", "tags") || {}
+    raw = tags["com.apple.quicktime.creationdate"] || tags["creation_time"]
+    DateTime.parse(raw) if raw
+  rescue
+    nil
   end
 
   def recorded_at_from_key(key)

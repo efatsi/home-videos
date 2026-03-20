@@ -1,0 +1,15 @@
+<div class="min-h-screen bg-gray-950 text-white px-6 py-10">
+  <div class="max-w-4xl mx-auto">
+    <%= link_to "← All Videos", videos_path, class: "text-sm text-gray-500 hover:text-white mb-6 inline-block" %>
+
+    <h1 class="text-2xl font-bold mt-4 mb-2"><%= @video.title %></h1>
+    <p class="text-sm text-gray-500 mb-6"><%= @video.recorded_at&.strftime("%-m/%-d/%Y") %></p>
+
+    <div class="aspect-video bg-black rounded-xl overflow-hidden">
+      <video controls class="w-full h-full" preload="metadata">
+        <source src="<%= @video.video_url %>" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+</div>
